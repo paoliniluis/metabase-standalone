@@ -1,0 +1,86 @@
+services:
+  metabase-standalone:
+    image: metabase/metabase-enterprise:v1.49.2
+    container_name: metabase-standalone
+    hostname: metabase
+    # volumes: 
+    #   - /dev/urandom:/dev/random:ro
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_CONNECTION_URI: "postgres://postgres-app-db:5432/metabase?user=metabase&password=mysecretpassword&sslmode=prefer"
+    ports:
+      - 3000:3000
+    networks:
+      - metanet1-standalone
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      postgres-app-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3000M
+        reservations:
+          cpus: '2'
+          memory: 1500M
+  postgres-app-db:
+    image: postgres:16.2-alpine
+    container_name: postgres-app-db
+    hostname: postgres-app-db
+    ports:
+      - 5432:5432
+    environment:
+      - "POSTGRES_USER=metabase"
+      - "POSTGRES_DB=metabase"
+      - "POSTGRES_PASSWORD=mysecretpassword"
+    # volumes:
+    #   - $PWD/postgres_origin:/var/lib/postgresql/data
+    networks: 
+      - metanet1-standalone
+    cpus: 1
+    mem_limit: 128m
+    command: -c log_statement=all
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metabase -d metabase"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3000M
+        reservations:
+          cpus: '2'
+          memory: 1500M
+  setup-postgres:
+    build: setup/.
+    container_name: setup-postgres
+    volumes:
+      - $PWD/setup/setup.py:/app/setup.py
+    networks:
+      - metanet1-standalone
+    depends_on:
+      metabase-standalone:
+        condition: service_healthy
+    command: python /app/setup.py
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 64M
+        reservations:
+          cpus: '0.5'
+          memory: 32M
+    environment:
+      host: http://metabase
+      port: 3000
+      dbs: 1
+networks: 
+  metanet1-standalone:
+    driver: bridge
