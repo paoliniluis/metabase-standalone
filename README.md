@@ -41,7 +41,3 @@ This is a docker-compose project that sets up a Metabase standalone instance alo
 
 username: a@b.com
 password: metabot1
-
-## Requirements
-
-Just docker
